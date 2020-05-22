@@ -12,3 +12,15 @@ We really appreciate contributions, but they must meet the following requirement
 We merge PRs into `development`, which is then tested in a sharded, replicated environment in our datacenter for regressions. Once everyone is happy, we merge to master - this is to maintain a bit of quality control past the usual PR process.
 
 **Thanks** for helping!
+
+# How to test the code
+In order to run the tests, you need the following installed (assuming Ubuntu)
+
+* daemontools (for svstat)
+* mongo (for mongo client)
+* mongodb (for mongo server)
+
+Before running the tests, you need to start the test mongo server with `make startdb`. After the tests are done, you
+can tear it down with `make stopdb`.
+
+The tests to run are defined in `.travis.yml` under the *script* section.
