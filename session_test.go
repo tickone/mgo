@@ -244,7 +244,6 @@ func (s *S) TestURLInvalidSafe(c *C) {
 // https://www.mongodb.com/blog/post/mongodb-3-6-here-to-SRV-you-with-easier-replica-set-connections.
 func (s *S) TestURLMongoServiceRecord(c *C) {
 	c.Skip("Requires DNS configuration / Atlas")
-	//
 	url := "mongodb+srv://<username>:<password>@<host>.mongodb.net/<db>?ssl=true"
 	dialInfo, err := mgo.ParseURL(url)
 	c.Assert(err, IsNil)
