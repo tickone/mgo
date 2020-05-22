@@ -24,3 +24,8 @@ Before running the tests, you need to start the test mongo server with `make sta
 can tear it down with `make stopdb`.
 
 The tests to run are defined in `.travis.yml` under the *script* section.
+
+## Note about DNS Lookup of SRV records
+If you are testing on Linux, you may run into an error that net.LookupSRV cannot parse the DNS response.
+In this case, you are likely using a distribution that uses systemd for DNS and go does not handle it yet.
+The easiest work around is to change your /etc/resolv.conf file and set a remote nameserver; 8.8.8.8 or 9.9.9.9.
