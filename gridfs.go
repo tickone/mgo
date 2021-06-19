@@ -36,7 +36,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/globalsign/mgo/bson"
+	"github.com/tickone/mgo/bson"
 )
 
 // GridFS stores files in two collections:
@@ -678,7 +678,7 @@ func (file *GridFile) insertChunk(data []byte) {
 // an error, if any.
 func (file *GridFile) Seek(offset int64, whence int) (pos int64, err error) {
 	file.m.Lock()
-	debugf("GridFile %p: seeking for %s (whence=%d)", file, offset, whence)
+	debugf("GridFile %p: seeking for %d (whence=%d)", file, offset, whence)
 	defer file.m.Unlock()
 	switch whence {
 	case os.SEEK_SET:

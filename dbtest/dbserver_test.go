@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	mgo "github.com/globalsign/mgo"
+	mgo "github.com/tickone/mgo"
 	. "gopkg.in/check.v1"
 
-	"github.com/globalsign/mgo/dbtest"
+	"github.com/tickone/mgo/dbtest"
 )
 
 type M map[string]interface{}
@@ -105,4 +105,64 @@ func (s *S) TestCheckSessionsDisabled(c *C) {
 	session := server.Session()
 	defer session.Close()
 	server.Wipe()
+}
+
+func (s *S) TestSetEngine(c *C) {
+	status := struct {
+		StorageEngine struct {
+			Name string `bson:"name"`
+		} `bson:"storageEngine"`
+	}{}
+	wtStatus := status
+
+	// mmapv1 (default)
+	var mmapServer dbtest.DBServer
+	mmapServer.SetPath(c.MkDir())
+	defer mmapServer.Stop()
+
+	mSession := mmapServer.Session()
+	defer mSession.Close()
+
+	err := mSession.Run("serverStatus", &status)
+	c.Assert(err, IsNil)
+	c.Assert(status.StorageEngine.Name, Equals, "mmapv1")
+
+	// wiredTiger
+	var wtServer dbtest.DBServer
+	wtServer.SetPath(c.MkDir())
+	wtServer.SetEngine("wiredTiger")
+	defer wtServer.Stop()
+
+	wSession := wtServer.Session()
+	defer wSession.Close()
+
+	err = wSession.Run("serverStatus", &wtStatus)
+	c.Assert(err, IsNil)
+	c.Assert(wtStatus.StorageEngine.Name, Equals, "wiredTiger")
+}
+
+func (s *S) TestReplicaSet(c *C) {
+
+	type Member struct {
+		State string `bson:"stateStr"`
+	}
+	type ReplSetStatus struct {
+		Members []Member `bson:"members"`
+	}
+	rsStatus := ReplSetStatus{}
+
+	var mServer dbtest.DBServer
+	mServer.SetPath(c.MkDir())
+	mServer.SetEngine("wiredTiger")
+	mServer.SetReplicaSet(true)
+
+	defer mServer.Stop()
+
+	mSession := mServer.Session()
+	defer mSession.Close()
+
+	err := mSession.Run("replSetGetStatus", &rsStatus)
+	c.Assert(err, IsNil)
+	c.Assert(len(rsStatus.Members), Equals, 1)
+	c.Assert(rsStatus.Members[0].State, Equals, "PRIMARY")
 }

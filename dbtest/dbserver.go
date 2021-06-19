@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	mgo "github.com/globalsign/mgo"
+	mgo "github.com/tickone/mgo"
 	"gopkg.in/tomb.v2"
 )
 
@@ -24,12 +24,16 @@ import (
 // Before the DBServer is used the SetPath method must be called to define
 // the location for the database files to be stored.
 type DBServer struct {
-	session *mgo.Session
-	output  bytes.Buffer
-	server  *exec.Cmd
-	dbpath  string
-	host    string
-	tomb    tomb.Tomb
+	session        *mgo.Session
+	output         bytes.Buffer
+	server         *exec.Cmd
+	dbpath         string
+	host           string
+	engine         string
+	rs             bool
+	disableMonitor bool
+	wtCacheSizeGB  float64
+	tomb           tomb.Tomb
 }
 
 // SetPath defines the path to the directory where the database files will be
@@ -39,7 +43,32 @@ func (dbs *DBServer) SetPath(dbpath string) {
 	dbs.dbpath = dbpath
 }
 
+// SetEngine defines the MongoDB storage engine to be used when starting the
+// server.
+func (dbs *DBServer) SetEngine(engine string) {
+	dbs.engine = engine
+}
+
+// SetReplicaSet if set to true, will initialize a 1 member replica set
+func (dbs *DBServer) SetReplicaSet(rs bool) {
+	dbs.rs = rs
+}
+
+// SetMonitor defines whether the MongoDB server should be monitored for crashes
+// panics, etc.
+func (dbs *DBServer) SetMonitor(enabled bool) {
+	dbs.disableMonitor = !enabled
+}
+
+// SetWiredTigerCacheSize sets the size (in gigabytes) of the WiredTiger cache
+func (dbs *DBServer) SetWiredTigerCacheSize(sizeGB float64) {
+	dbs.wtCacheSizeGB = sizeGB
+}
+
 func (dbs *DBServer) start() {
+	if dbs.engine == "" {
+		dbs.engine = "mmapv1"
+	}
 	if dbs.server != nil {
 		panic("DBServer already started")
 	}
@@ -55,15 +84,37 @@ func (dbs *DBServer) start() {
 	l.Close()
 	dbs.host = addr.String()
 
+	portString := strconv.Itoa(addr.Port)
 	args := []string{
 		"--dbpath", dbs.dbpath,
 		"--bind_ip", "127.0.0.1",
-		"--port", strconv.Itoa(addr.Port),
-		"--nssize", "1",
-		"--noprealloc",
-		"--smallfiles",
-		"--nojournal",
+		"--port", portString,
+		"--storageEngine=" + dbs.engine,
 	}
+
+	switch dbs.engine {
+	case "wiredTiger":
+		if dbs.wtCacheSizeGB == 0 {
+			dbs.wtCacheSizeGB = 0.1
+		}
+		args = append(args, fmt.Sprintf("--wiredTigerCacheSizeGB=%.2f", dbs.wtCacheSizeGB))
+	case "mmapv1":
+		args = append(args,
+			"--nssize", "1",
+			"--noprealloc",
+			"--smallfiles",
+		)
+		// Nojournal can only be enabled if
+		// it is NOT a replica set
+		if !dbs.rs {
+			args = append(args, "--nojournal")
+		}
+	}
+
+	if dbs.rs {
+		args = append(args, "--replSet", "rs0")
+	}
+
 	dbs.tomb = tomb.Tomb{}
 	dbs.server = exec.Command("mongod", args...)
 	dbs.server.Stdout = &dbs.output
@@ -74,7 +125,21 @@ func (dbs *DBServer) start() {
 		fmt.Fprintf(os.Stderr, "mongod failed to start: %v\n", err)
 		panic(err)
 	}
-	dbs.tomb.Go(dbs.monitor)
+
+	if dbs.rs {
+		time.Sleep(1 * time.Second)
+		rs := exec.Command("mongo", "127.0.0.1:"+portString, "--eval", "rs.initiate()")
+		err = rs.Run()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "replicaset initiate failed: %v\n", err)
+			panic(err)
+		}
+	}
+
+	if !dbs.disableMonitor {
+		dbs.tomb.Go(dbs.monitor)
+	}
+
 	dbs.Wipe()
 }
 
@@ -140,7 +205,8 @@ func (dbs *DBServer) Session() *mgo.Session {
 	if dbs.session == nil {
 		mgo.ResetStats()
 		var err error
-		dbs.session, err = mgo.Dial(dbs.host + "/test")
+		d, err := mgo.ParseURL(dbs.host + "/test?connect=replicaSet")
+		dbs.session, err = mgo.DialWithInfo(d)
 		if err != nil {
 			panic(err)
 		}

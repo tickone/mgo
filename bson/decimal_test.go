@@ -1,4 +1,4 @@
-﻿// BSON library for Go
+// BSON library for Go
 //
 // Copyright (c) 2010-2012 - Gustavo Niemeyer <gustavo@niemeyer.net>
 //
@@ -33,7 +33,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/globalsign/mgo/bson"
+	"github.com/tickone/mgo/bson"
 
 	. "gopkg.in/check.v1"
 )
@@ -145,6 +145,14 @@ func (s *S) TestDecimalTests(c *C) {
 			data, err = bson.Marshal(parsedValue)
 			c.Assert(err, IsNil)
 			c.Assert(hex.EncodeToString(data), Equals, test.BSON)
+
+			// Check that implemented `encoding.TextMarshaler` leads to working json encoding.
+			jsonBytes, err := json.Marshal(dec128)
+			c.Assert(err, IsNil)
+			var newDec128 bson.Decimal128
+			err = json.Unmarshal(jsonBytes, &newDec128)
+			c.Assert(err, IsNil)
+			c.Assert(newDec128, Equals, dec128)
 		}
 
 		for _, test := range tests.ParseErrors {
