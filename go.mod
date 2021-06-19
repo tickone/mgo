@@ -1,4 +1,6 @@
-module github.com/globalsign/mgo
+module github.com/tickone/mgo
+
+go 1.15
 
 require (
 	github.com/kr/pretty v0.1.0 // indirect

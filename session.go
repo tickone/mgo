@@ -46,7 +46,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/globalsign/mgo/bson"
+	"github.com/tickone/mgo/bson"
 )
 
 // Mode read preference mode. See Eventual, Monotonic and Strong for details
@@ -955,7 +955,7 @@ func parseHosts(host string) (string, error) {
 
 // LookupSRV was largely pulled from the new, offical mongo driver at
 // https://github.com/mongodb/mongo-go-driver/blob/f1f16a1f4d769d844812278841a184ae7f301732/x/mongo/driver/topology/polling_srv_records_test.go#L44
-// As the globalsign driver has no good place to keep the state, all of the extra state
+// As the tickone driver has no good place to keep the state, all of the extra state
 // related code was removed. This means a DNS lookup is going to happen every time
 // even if it failed the time before.
 func lookupSRV(service, proto, name string) (string, []*net.SRV, error) {
